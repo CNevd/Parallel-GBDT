@@ -17,28 +17,6 @@
 #include <omp.h>
 using namespace std;
 
-struct ForestConfig {    
-    int min_children;
-    int depth;
-    int max_feature;
-    int tree_cnt;
-    int max_pos;
-    float bootstrap;
-    float step ;      
-    int nthread;
-    
-    ForestConfig() {
-        min_children = 10;
-        depth = 8;
-        tree_cnt = 50;
-        max_feature = -1;        
-        max_pos = -1;
-        bootstrap = 0;
-        step = 0.1;            
-        nthread = 1;
-    }
-};
-
 // instance info
 struct DFeature {
     vector<float> f; // features of this instance
@@ -484,7 +462,7 @@ float cal_auc(vector<float> &pred, vector<float> &gt) {
 class BoostedForest {
     public:
     vector<DecisionTree*> trees;
-    int depth, max_feature, max_pos, min_children, nthread;
+    int depth, max_feature, max_pos, min_children, nthread, num_tree;
     float bootstrap, step;
     vector<float> cur_vals, ori_vals;
     vector<float> steps;
@@ -495,23 +473,27 @@ class BoostedForest {
         step = 0.1;
         depth = 5;
         max_feature = max_pos = -1;
-        min_children = 50;
+        min_children = 10;
+        nthread = 1;
+        bootstrap = 0;
+        num_tree = 50;
     }
     
     void set_val_data(vector<DFeature> &data) {
         val_features_ptr = &data;
     }
-    
-    void buildForest(vector<DFeature> &features, int num_tree, int depth_, int max_feature_, 
-        int max_pos_, int min_children_, float bootstrap_, float step_, int nthread_) {        
+
+    void set_params(const char *name, const char *val) {
+        if (!strcmp(name, "num_tree")) num_tree = atoi(val);
+        if (!strcmp(name, "depth")) depth = atoi(val);
+        if (!strcmp(name, "min_children")) min_children = atoi(val);
+        if (!strcmp(name, "nthread")) nthread = atoi(val);
+        if (!strcmp(name, "step")) step = static_cast<float> (atof(val));
+        if (!strcmp(name, "bootstrap")) bootstrap = static_cast<float> (atof(val));
+    }   
+ 
+    void buildForest(vector<DFeature> &features) {        
                 
-        depth = depth_;
-        max_feature = max_feature_;
-        max_pos = max_pos_;
-        min_children = min_children_;
-        bootstrap = bootstrap_;
-        step = step_;
-        nthread = nthread_;
         if (max_feature < 0) max_feature = int(sqrt(features[0].f.size()) + 1);
 
         // load train data
@@ -581,12 +563,6 @@ class BoostedForest {
             features[j].y = ori_vals[j];
     }
 
-    void buildForest(vector<DFeature> &features, ForestConfig &conf) {
-        buildForest(features, conf.tree_cnt, conf.depth, conf.max_feature, conf.max_pos, 
-            conf.min_children, conf.bootstrap, conf.step, conf.nthread);
-    }
-    
-    
     void addTree(vector<DFeature> &features) {        
         addTree(features, 1);
     }
